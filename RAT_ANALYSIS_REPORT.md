@@ -31,6 +31,8 @@ C2 is a **managed infrastructure** at `https://www.capebej.com` (a decoy site `h
 
 **Real-world impact:** the sample is consistent with a reported case in which a victim's bank account was drained (victim-reported tens of thousands of INR) after the phone displayed a **fake "system update" screen** while the fraud executed in the background — the operator locks the device, opens the banking/UPI app, injects taps, reads the OTP, and transfers funds, all hidden behind the fake update overlay (see §6.6).
 
+**Second sample / distribution (see §9):** a newer build of the same campaign is distributed from **`watchedlwfreelive.com`** → an **AWS Lambda (Mumbai)** → **AWS S3** (`ap-south-1`). The downloaded APK is a **dropper** that installs a fake Google-Play "Installing…" screen and then delivers the **same RAT** (`b.apk`, package `com.yunyou.control.dev`).
+
 **Not implemented:** microphone recording, camera capture, GPS/location, contacts, call-log, clipboard read, shell, WebRTC/VNC. (Remote control is screenshot+accessibility, not live video.)
 
 ---
@@ -290,21 +292,93 @@ This is not a generic Android RAT. Several subsystems are unusually sophisticate
 
 ---
 
-## 9. Indicators of Compromise
+## 9. Second sample & distribution / dropper chain (2026-11-02)
+
+A second, related sample was supplied from the live distribution site **`watchedlwfreelive.com`**. It is the **same campaign**, delivered through a stager, and reuses the **identical RAT payload package** (`com.yunyou.control.dev`).
+
+### 9.1 Distribution chain (verified)
+
+```
+http://watchedlwfreelive.com/            fake "LWTV – Live TV" landing page
+   │  (Cloudflare; created 2026-10-20 via Realtime Register; Facebook Pixel 1433766308938419)
+   │  download button → DOWNLOAD_URL
+   ▼
+https://5ewupcxyoz7bkics25pp7nq36e0davfa.lambda-url.ap-south-1.on.aws/LW-TV   AWS Lambda (302)
+   ▼
+https://an0opchi4607663.s3.ap-south-1.amazonaws.com/LW-TV.apk                 AWS S3, ap-south-1 (Mumbai)
+```
+
+- Landing page is a polished lookalike channel: real-looking screenshots, install steps, and a **Facebook Pixel**. This is a **distribution** host — **distinct from the C2** (`capebej.com`) and the decoy brand (`famelack.com`).
+- Delivery infrastructure is hosted in **AWS `ap-south-1` (Mumbai)** — consistent with the **India** target.
+
+### 9.2 Dropper → RAT chain (runtime, verified in the emulator)
+
+The downloaded `LW-TV.apk` is **not** the RAT itself; it is a **stager**:
+
+| Stage | Package | Role |
+|---|---|---|
+| `LW-TV.apk` (6.1 MB→11.2 MB, `com.dexjh.oan.jwwvgypi`) | dropper | Drops the real RAT and shows a **fake Google-Play "Installing…" screen** |
+| `b.apk` (6.1 MB) — dropped to `files/assets_i/b.apk` | **`com.yunyou.control.dev`** | **The actual RAT — same package as the original sample** |
+
+Runtime artifacts written by the dropper (pulled from the device):
+
+- `files/assets_i/b.apk` — the RAT it installs (`REQUEST_INSTALL_PACKAGES`)
+- `files/assets_i/installing.html` — a **fake "Installing…" progress page** styled as the Google Play Store (contains Chinese CSS comments, e.g. `增加对html的限制，彻底隐藏各端滚动条` — "hide scrollbars on all platforms", confirming CN authorship)
+- `files/assets_i/Google_Play.png` — fake Play Store branding
+- `oat/arm64/Anonymous-DexFile@*.vdex` — in-memory DEX (same encrypted-in-memory design)
+
+The dropper also gained capabilities the first sample lacked: **`REQUEST_INSTALL_PACKAGES`** (install the stage-2 RAT) and a **VPN service** (`com.shell.a.PpVpn`, `BIND_VPN_SERVICE`). Its launcher is a generic decoy `com.shell.a.MainActivity`.
+
+### 9.3 "Same RAT" confirmation (`b.apk`)
+
+`b.apk` is byte-for-byte a different build of the same malware:
+
+- **Package identical:** `com.yunyou.control.dev` (label `LWTV`)
+- **Entry class:** `com.yunyou.control.AgentApplication`
+- **Identical real-permission set (17)** as the original sample — incl. `READ_SMS`, `RECEIVE_SMS`, `RECEIVE_BOOT_COMPLETED`, `WRITE_SETTINGS`, `USE_BIOMETRIC`, `USE_FINGERPRINT`, `USE_EXACT_ALARM`, `FOREGROUND_SERVICE*`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, `MODIFY_AUDIO_SETTINGS`, `WAKE_LOCK`, `POST_NOTIFICATIONS`, `com.google.android.c2dm.permission.RECEIVE`
+- Same encrypted AES-GCM in-memory payload design (C2 domain remains inside the encrypted payload; not re-derived here).
+
+### 9.4 New sample hashes
+
+```
+e1c40c91be4265ff94fc56d931d1e7add46b00ada61d6c308e77acb84ca92c2a  LW-TV.apk  (dropper, com.dexjh.oan.jwwvgypi)
+bf918302e5bac36fb849ed8a967cc91bcee691c2f9f7d284a20e489749a15b32  b.apk      (RAT, com.yunyou.control.dev)
+```
+
+### 9.5 Updated infrastructure
+
+Add to the network IoC list (§10):
+
+```
+watchedlwfreelive.com                         # fake LWTV landing / distribution page (Cloudflare)
+5ewupcxyoz7bkics25pp7nq36e0davfa.lambda-url.ap-south-1.on.aws   # APK redirect (AWS Lambda, Mumbai)
+an0opchi4607663.s3.ap-south-1.amazonaws.com   # APK storage (AWS S3, ap-south-1), object LW-TV.apk
+```
+
+> The C2 (`www.capebej.com`) remains as previously reported; the distributor and decoy are separate hosts. The dropper/stager pattern (fake Play-Store "Installing…" screen → install stage-2 RAT) is a **new evolution** of the earlier single-APK + fake-update-overlay delivery.
+
+---
+
+## 10. Indicators of Compromise
 
 **Files / hashes**
 - APK: `LWTV_com.yunyou.control.dev_v274.533.185.apk` — `056a8db666e4f154f9f6d0b7a00aa0703d2990ee2b1a085b7339a49bdef90495`
 - Encrypted payload asset: `assets/VOUALmvLXIYX` (4,549,938 bytes) — `49c15345d5df2f97e2b1272fe759da554723bafef84e1e7c8a6b7115453f687e`
 - Decrypted payload DEX — `cf6153e8e4b78cff0526df2d4580cbb48f816a460ec719808303c4e59927eb12`
+- **Dropper (`LW-TV.apk`, `com.dexjh.oan.jwwvgypi`)** — `e1c40c91be4265ff94fc56d931d1e7add46b00ada61d6c308e77acb84ca92c2a`
+- **Stage-2 RAT (`b.apk`, `com.yunyou.control.dev`)** — `bf918302e5bac36fb849ed8a967cc91bcee691c2f9f7d284a20e489749a15b32`
 
 **Network**
 - `https://www.capebej.com` (C2 base) — paths `/m9eu/00/*`
 - `wss://{origin}/m9eu/00/d1`
 - `https://famelack.com/` (decoy)
+- `watchedlwfreelive.com` (fake LWTV **distribution** page)
+- `5ewupcxyoz7bkics25pp7nq36e0davfa.lambda-url.ap-south-1.on.aws` (APK redirect, AWS Lambda Mumbai)
+- `an0opchi4607663.s3.ap-south-1.amazonaws.com` (APK storage, AWS S3 `ap-south-1`, object `LW-TV.apk`)
 - Firebase project `whh6666-fcm`, sender `149789333529`
 - MQTT topics `yy/v1/device/{username}/session|/up|/down`
 
-### 9.1 Attacker infrastructure (IPs)
+### 10.1 Attacker infrastructure (IPs)
 
 > **Important:** the APK contains **no hardcoded IP addresses** — only the domain `www.capebej.com`. The C2 resolves endpoint *origins* at runtime from a signed manifest (`/m9eu/00/it2`), so the actual server IPs can and do rotate. The IPs below are the live resolution of the embedded hostnames at analysis time and are for blocking/threat-intel reference, not fixed indicators.
 
@@ -342,11 +416,11 @@ famelack.com
 
 ---
 
-## 10. Attribution — Chinese developers, India-targeted
+## 11. Attribution — Chinese developers, India-targeted
 
 > **Assessment: the implant is built by Chinese-speaking developers and deployed against victims in India.** Confidence: **high** for "China-built" (branding + UI language) and **high** for "India-targeted" (payment-app/keyboard/locale targeting + deployment geometry). The operator console/UI is Chinese (product "云游控制"); the victim side is Indian (UPI/payment apps, English-locale devices, Indian SIM handling) — a classic **China-based developer → India victim** remote-control/stalkerware deployment.
 
-### 10.0 Why India is the target (operator claim corroborated by code)
+### 11.0 Why India is the target (operator claim corroborated by code)
 
 - **UPI / Indian payment apps are singled out by name** (`GPaySniffer.java:31,76`): `com.google.android.apps.nbu.paisa.user` (**Google Pay India**), `com.google.android.apps.nbu.india.prod`, `com.phonepe.app` (**PhonePe**), `net.one97.paytm` (**Paytm**), `in.org.npci.upiapp` (**BHIM / NPCI UPI**), plus Amazon-India and WhatsApp. The sniffer dynamically hides its accessibility scope around exactly these apps to **harvest UPI/payment credentials and OTPs without being seen**.
 - **Indian SIM handling:** SIM **PIN/PUK** entry capture (`SimPin`/`SimPuk`, `sim_pin_entry`, `keyguard_sim_pin_view`/`keyguard_sim_puk_view`, `com.android.systemui:id/simPinEntry`) — Indian carriers commonly enforce a default SIM PIN, so stealing it yields call/SMS control.
@@ -354,7 +428,7 @@ famelack.com
 - **SMS/OTP theft** (`READ_SMS`/`RECEIVE_SMS`, ``SmsInitialSync``) + **lock-screen PIN/pattern capture** — the standard India toolkit for **banking/UPI fraud** (wash the OTP + unlock the device + replay the UPI PIN).
 - **Device/OEM mix:** India's market is dominated by Xiaomi, Samsung, vivo, OPPO/realme, Motorola — exactly the OEM set the sample enumerates for auto-start persistence.
 
-### 10.0.1 China-side developer footprints
+### 11.0.1 China-side developer footprints
 
 - **Product/branding is Chinese:** `云游控制` ("Yunyou Control"); all operator strings are Simplified Chinese (enrollment/licensing UX references `管理员` — "administrator"). Bilingual dev string `"\n开发测试设备 / DEV TEST DEVICE\n"`.
 - **Package/naming:** `com.yunyou.control` (pinyin `yunyou`), loader namespace `com.wipjt.payvpkyvn.qczs.wfqq`, FCM project `whh6666-fcm`.
@@ -362,7 +436,7 @@ famelack.com
 
 > **Confidence note:** the linguistic/branding evidence (Chinese product) and the targeting evidence (India) are both strong and mutually consistent. A specific named group is **not** established; attribute by infrastructure (`capebej.com`/`famelack.com`, FCM `whh6666-fcm`) and TTPs.
 
-### 10.1 Language evidence (Simplified Chinese)
+### 11.1 Language evidence (Simplified Chinese)
 
 
 All operator-facing strings are **Simplified Chinese** (with English glosses appended by the authors), e.g.:
@@ -384,7 +458,7 @@ All operator-facing strings are **Simplified Chinese** (with English glosses app
 - The **"管理员" (administrator)** enrollment/licensing model, the "停止协助" (stop-assistance) UX, and the 助控 framing are typical of the **Chinese commercial remote-assistance / 助控 grayware** ecosystem.
 - The build also carries a developer string `"\n开发测试设备 / DEV TEST DEVICE\n"` — intentional CN+EN bilingual labels (the authors translated their own UI).
 
-### 10.2 OEM persistence targeting (China-market + India-market overlap)
+### 11.2 OEM persistence targeting (China-market + India-market overlap)
 
 - The app explicitly **queries and manipulates the auto-start / power / permission managers of essentially every major OEM** — the same Chinese-brand OEMs that also dominate the Indian market:
   - **Xiaomi/MIUI** (`com.miui.securitycenter`, `com.miui.permcenter.autostart…`, `com.miui.powerkeeper`),
@@ -395,19 +469,19 @@ All operator-facing strings are **Simplified Chinese** (with English glosses app
 - Accessibility/anti-kill handling enumerates these OEM packages to keep itself alive and to hide from the vendor's security centers. The set covers both the **Chinese** and **Indian** device markets; combined with the UPI/payment and English-locale targeting (§10.0), the primary victim market is **India**.
 - A separate **Japanese** UI pack (~22 kana strings) also ships, showing the product is resold across East-Asian/other markets — but the India-specific payment/SIM/UPI logic is the strongest market signal.
 
-### 10.3 Code / build fingerprints
+### 11.3 Code / build fingerprints
 
 - Package `com.yunyou.control`, loader namespace `com.wipjt.payvpkyvn.qczs.wfqq` (pinyin-derived base `wipjt`), FCM project `whh6666-fcm` (digit-letter handle), branding `云游控制`.
 - Kotlin + coroutines + OkHttp + Paho MQTT5 + Firebase — modern, competent engineering (not a low-skill copy-paste sample).
 
-### 10.4 Counter-evidence / caveats (why this is not a firm attribution)
+### 11.4 Counter-evidence / caveats (why this is not a firm attribution)
 
 - **Infrastructure is deliberately offshore/neutral**, not Chinese: C2 `www.capebej.com` → `213.111.157.6` (Trunk Networks, ASN 43180, Seychelles-registered, SG range); decoy `famelack.com` (Porkbun + Cloudflare). Both domains Cloudflare-registered.
 - **No China-only artifacts**: no Baidu/Qihoo/Tencent/Alipay SDKs, no CN-only C2 domains, no non-Unicode (GBK) encodings that would uniquely localize the authors.
 - Chinese strings are widely reused/copied; they may reflect the **contractor/operator locale** rather than the code authors' nationality.
 - The product model (administrator-provisioned, account-bound enrollment, per-deployment APK) is a **resellable commercial service**; RAT/stalkerware tooling of this style is redistributed across regions.
 
-### 10.5 Assessment
+### 11.5 Assessment
 
 | Claim | Confidence |
 |---|---|
@@ -420,7 +494,7 @@ All operator-facing strings are **Simplified Chinese** (with English glosses app
 
 ---
 
-## 11. Conclusion & recommendations
+## 12. Conclusion & recommendations
 
 **Verdict:** Confirmed, actively-operated **Android RAT** ("yunyou.control" / 助控), **built by Chinese-speaking developers and deployed against victims in India** (§10). It provides remote screen control, accessibility keylogging, lock-screen credential theft (PIN/pattern/password + fake biometric prompt), **UPI/banking credential & OTP theft** targeting Google Pay India / PhonePe / Paytm / BHIM-NPCI / Amazon / WhatsApp, **SIM PIN/PUK capture**, SMS theft, app-inventory exfil, hardcoded auto-enrollment, and aggressive anti-uninstall/anti-detection. C2 at `capebej.com` over pinned TLS with WebSocket + MQTT5 fallback and FCM wake. No camera/mic/GPS/contacts/call-log/shell/WebRTC.
 

@@ -46,7 +46,7 @@ The phone shows a convincing **fake "system update"** (or fingerprint/face-verif
 
 ## Sample Info
 
-| Field | Value |
+| File | Value |
 |---|---|
 | File | `LWTV_com.yunyou.control.dev_v274.533.185.apk` |
 | Size | 6,158,481 bytes |
@@ -58,6 +58,15 @@ The phone shows a convincing **fake "system update"** (or fingerprint/face-verif
 | versionName | `274.533.185` (manifest) / payload `0.2.0` |
 | minSdk / targetSdk | 28 / 34 |
 | Built with | R8 8.2.2-dev, Kotlin + coroutines + OkHttp + Paho MQTT5 + Firebase |
+
+### Second sample (dropper campaign, 2026-11-02)
+
+A related build is distributed from `watchedlwfreelive.com` → AWS Lambda (Mumbai) → AWS S3 (`ap-south-1`). The downloaded APK is a **dropper** that shows a fake Google-Play "Installing…" screen and then installs the **same RAT** (`b.apk`, package `com.yunyou.control.dev`).
+
+| Artifact | SHA-256 | Notes |
+|---|---|---|
+| `LW-TV.apk` | `e1c40c91be4265ff94fc56d931d1e7add46b00ada61d6c308e77acb84ca92c2a` | Dropper `com.dexjh.oan.jwwvgypi` |
+| `b.apk` | `bf918302e5bac36fb849ed8a967cc91bcee691c2f9f7d284a20e489749a15b32` | Stage-2 RAT `com.yunyou.control.dev` |
 
 ---
 
@@ -184,6 +193,9 @@ capebej.com
 famelack.com           # decoy site
 whh6666-fcm            # Firebase project (sender 149789333529)
 yy/v1/device/{user}/session|/up|/down   # MQTT topics
+watchedlwfreelive.com                              # fake LWTV distribution page
+5ewupcxyoz7bkics25pp7nq36e0davfa.lambda-url.ap-south-1.on.aws   # APK redirect (Lambda, Mumbai)
+an0opchi4607663.s3.ap-south-1.amazonaws.com        # APK storage (S3 ap-south-1)
 ```
 
 ### On-device
@@ -256,6 +268,8 @@ Password: `infected` (industry-standard convention for malware archives)
 #   LWTV_com.yunyou.control.dev_v274.533.185.apk   (original distributed APK)
 #   decrypted_payload.dex                          (9.95 MB decrypted RAT DEX)
 #   extract/assets/VOUALmvLXIYX                    (AES-GCM encrypted payload asset)
+#   LW-TV.apk                                      (dropper, com.dexjh.oan.jwwvgypi)
+#   b.apk                                          (stage-2 RAT, com.yunyou.control.dev)
 ```
 
 These are live malware. Extract and handle only inside a disposable, network-isolated analysis environment. Verify hashes against `LWTV.sha256.txt` before use. Do not execute.
