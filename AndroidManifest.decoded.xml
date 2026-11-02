@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DECODED / EFFECTIVE AndroidManifest.xml for com.yunyou.control.dev ("LWTV")
+  Reconstructed from the Android OS's own parse of the installed package
+  (adb shell dumpsys package com.yunyou.control.dev) because the on-disk
+  AndroidManifest.xml is deliberately obfuscated:
+    - padded to 56 MB with the AXML `fileSize` field set to match
+    - attribute names/values replaced with UNKNOWN_SYSTEM_ATTRIBUTE_* placeholders
+    - 999 declared permissions, of which 982 are fake/hallucinated (see note below)
+  This file shows the manifest as the framework actually resolved it.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.yunyou.control.dev"
+    android:versionCode="2053099"
+    android:versionName="274.533.185"
+    android:compileSdkVersion="36"
+    android:compileSdkVersionCodename="16"
+    android:platformBuildVersionCode="36"
+    android:platformBuildVersionName="16">
+
+    <uses-sdk
+        android:minSdkVersion="28"
+        android:targetSdkVersion="34" />
+
+    <!--
+      NOTE: The APK declares 999 <uses-permission> entries. 982 are fabricated
+      names under the "com.splm.qwcqu.*" namespace (e.g. PUSH_SERVICE_XFLRUE,
+      CACHE_CONTROL_TJVCTR) used purely to bloat/confuse the manifest. The 17
+      that are REAL platform permissions are listed below.
+    -->
+
+    <!-- ===== REAL, security-relevant permissions ===== -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+
+    <!-- ===== FAKE permissions (com.splm.qwcqu.*), examples ===== -->
+    <!-- 982 fabricated entries total, e.g.:
+         com.splm.qwcqu.PUSH_SERVICE_XFLRUE
+         com.splm.qwcqu.CACHE_CONTROL_TJVCTR
+         com.splm.qwcqu.SYSTEM_SERVICE_BCTAGZ
+         com.splm.qwcqu.FOREGROUND_SERVICE_BEPLNB
+         com.splm.qwcqu.TOKEN_MANAGER_CWJDZR
+         ... (see full-app-dump for the complete list)
+    -->
+
+    <uses-feature android:name="android.hardware.faketouch" android:required="true" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+
+    <application
+        android:name="com.yunyou.control.AgentApplication"
+        android:label="LWTV"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        android:extractNativeLibs="false">
+
+        <!-- ===== ACTIVITY ===== -->
+        <activity
+            android:name="com.yunyou.control.HomeActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- ===== ACCESSIBILITY SERVICE (core of the RAT) ===== -->
+        <service
+            android:name="com.yunyou.control.AssistanceAccessibilityService"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- ===== SERVICES ===== -->
+        <service android:name="com.yunyou.control.FcmWakeService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <service android:name="com.google.firebase.messaging.FirebaseMessagingService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- ===== RECEIVERS ===== -->
+        <receiver android:name="com.yunyou.control.LifecycleReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name="com.yunyou.control.SmsReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ===== PROVIDER ===== -->
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="com.yunyou.control.dev.firebaseinitprovider"
+            android:exported="false" />
+
+    </application>
+</manifest>

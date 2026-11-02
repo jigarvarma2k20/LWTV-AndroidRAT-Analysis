@@ -1,0 +1,14 @@
+# --- Malware: never commit raw samples/artifacts ---
+*.apk
+*.dex
+/assets/
+/extract/
+AndroidManifest.xml
+# (the padded 56MB binary manifest — use AndroidManifest.decoded.xml instead)
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
